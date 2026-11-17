@@ -1,0 +1,51 @@
+services:
+  core-db:
+    image: postgres:15-alpine
+    container_name: core-db
+    environment:
+      POSTGRES_DB: banking_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d banking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  account-service:
+    build: ./account-service
+    container_name: account-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://core-db:5432/banking_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password123
+    depends_on:
+      core-db:
+        condition: service_healthy
+    networks:
+      - banking-network
+
+  transaction-service:
+    build: ./transaction-service
+    container_name: transaction-service
+    ports:
+      - "8081:8081"
+    environment:
+      ACCOUNT_SERVICE_URL: http://account-service:8080
+    depends_on:
+      - account-service
+    networks:
+      - banking-network
+
+networks:
+  banking-network:
+    driver: bridge
+
+volumes:
+  pg-data:
